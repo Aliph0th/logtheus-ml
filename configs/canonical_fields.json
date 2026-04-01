@@ -1,0 +1,17 @@
+{
+  "canonical_fields": [
+    "service",
+    "level",
+    "timestamp",
+    "environment",
+    "event",
+    "error_code",
+    "error_message",
+    "status_code",
+    "duration_ms",
+    "ip",
+    "method",
+    "path",
+    "useragent"
+  ]
+}

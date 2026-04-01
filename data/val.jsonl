@@ -1,0 +1,1 @@
+{"id":"3","text":"gateway WARN trace=tr-778 duration=42ms ip=192.168.1.10","entities":[{"start":0,"end":7,"label":"service"},{"start":8,"end":12,"label":"level"},{"start":19,"end":25,"label":"trace_id"},{"start":35,"end":39,"label":"duration_ms"},{"start":43,"end":55,"label":"ip"}]}
