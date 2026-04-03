@@ -44,14 +44,14 @@ Training input format is JSONL (`data/train.jsonl`, `data/val.jsonl`):
 
 ```bash
 python -m venv .venv
-. .venv/Scripts/activate
+./.venv/Scripts/activate
 pip install -r requirements.txt
 ```
 
 ## Train
 
 ```bash
-python training/train_token_classifier.py --train-file data/train.jsonl --val-file data/val.jsonl --output-dir artifacts/model_v1
+python training/train_token_classifier.py --train-file data/data.jsonl --val-file data/val.jsonl --output-dir artifacts/model_v1
 ```
 
 Default base model: `bert-base-uncased` (110M params, good quality/speed balance for logs).
@@ -59,17 +59,8 @@ Default base model: `bert-base-uncased` (110M params, good quality/speed balance
 To use a different model:
 
 ```bash
-python training/train_token_classifier.py --train-file data/train.jsonl --val-file data/val.jsonl --output-dir artifacts/model_v1 --base-model distilbert-base-uncased
+python training/train_token_classifier.py --train-file data/data.jsonl --val-file data/val.jsonl --output-dir artifacts/model_v1 --base-model distilbert-base-uncased
 ```
-
-Available options:
-- `bert-base-uncased` (default): 110M params, balanced quality/speed
-- `bert-base-cased`: case-sensitive variant
-- `distilbert-base-uncased`: 66M params, faster but slightly lower quality
-- `roberta-base`: improved BERT, slightly better quality
-- `microsoft/codebert-base`: for code-like logs
-- `allenai/scibert-base`: for scientific/monitoring logs
-
 ## Inference Example
 
 ```bash

@@ -4,8 +4,6 @@ import argparse
 import json
 from pathlib import Path
 
-from ..src.utils import load_jsonl
-
 import evaluate
 import numpy as np
 from datasets import Dataset
@@ -18,13 +16,24 @@ from transformers import (
 )
 
 
+def load_jsonl(path: Path) -> list[dict]:
+    rows = []
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            rows.append(json.loads(line))
+    return rows
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--train-file", required=True)
     parser.add_argument("--val-file", required=True)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--base-model", default="bert-base-uncased")
-    parser.add_argument("--epochs", type=int, default=3)
+    parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument("--batch-size", type=int, default=16)
     args = parser.parse_args()
 
