@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.logtheus_ml.inference import LogAttributeExtractor
 
