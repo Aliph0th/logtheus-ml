@@ -66,13 +66,11 @@ class LogAttributeExtractor:
                     np.int64)
             outputs = self.onnx_session.run(None, onnx_inputs)
             logits = np.asarray(outputs[0])[0]
-            input_ids = encoded["input_ids"][0].tolist()
         else:
             assert self.model is not None
             with torch.no_grad():
                 out = self.model(**encoded)
             logits = out.logits[0].cpu().numpy()
-            input_ids = encoded["input_ids"][0].tolist()
 
         probs = softmax(logits)
         pred_ids = probs.argmax(axis=-1)
@@ -81,69 +79,85 @@ class LogAttributeExtractor:
         grouped_values: dict[str, list[str]] = defaultdict(list)
         grouped_scores: dict[str, list[float]] = defaultdict(list)
 
-        current_label = None
-        current_value = []
-        current_scores = []
+        current_label: str | None = None
+        current_start: int | None = None
+        current_end: int | None = None
+        current_scores: list[float] = []
 
-        tokens = self.tokenizer.convert_ids_to_tokens(input_ids)
+        def flush_current() -> None:
+            nonlocal current_label, current_start, current_end, current_scores
+            if current_label is None or current_start is None or current_end is None:
+                current_label = None
+                current_start = None
+                current_end = None
+                current_scores = []
+                return
 
-        for token, pred_id, score, (start, end) in zip(tokens, pred_ids, pred_scores, offsets):
+            value = text[current_start:current_end]
+            if value:
+                grouped_values[current_label].append(value)
+                grouped_scores[current_label].append(float(np.mean(current_scores)) if current_scores else 0.0)
+
+            current_label = None
+            current_start = None
+            current_end = None
+            current_scores = []
+
+        for pred_id, score, (start, end) in zip(pred_ids, pred_scores, offsets):
             if start == end:
                 continue
 
             label = self.id2label[int(pred_id)]
             if label == "O":
-                if current_label and current_value:
-                    grouped_values[current_label].append(
-                        "".join(current_value).replace("##", ""))
-                    grouped_scores[current_label].append(
-                        float(np.mean(current_scores)))
-                current_label = None
-                current_value = []
-                current_scores = []
+                flush_current()
                 continue
 
             prefix, entity = label.split("-", maxsplit=1)
 
-            normalized_piece = token.replace("##", "")
-            if prefix == "B" or (current_label and current_label != entity):
-                if current_label and current_value:
-                    grouped_values[current_label].append(
-                        "".join(current_value))
-                    grouped_scores[current_label].append(
-                        float(np.mean(current_scores)))
+            if prefix == "B" or (current_label is not None and current_label != entity):
+                flush_current()
                 current_label = entity
-                current_value = [normalized_piece]
+                current_start = int(start)
+                current_end = int(end)
                 current_scores = [float(score)]
             else:
+                if current_label is None:
+                    current_label = entity
+                    current_start = int(start)
+                    current_end = int(end)
+                    current_scores = [float(score)]
+                    continue
                 current_label = entity
-                current_value.append(normalized_piece)
+                current_end = int(end)
                 current_scores.append(float(score))
 
-        if current_label and current_value:
-            grouped_values[current_label].append("".join(current_value))
-            grouped_scores[current_label].append(
-                float(np.mean(current_scores)))
+        flush_current()
 
         attributes: dict[str, str | list[str]] = {}
-        unknown_attributes: dict[str, str | list[str]] = {}
+        low_confidence_attributes: dict[str, str | list[str]] = {}
+        attribute_confidence: dict[str, float | list[float]] = {}
         all_scores: list[float] = []
 
         for label, values in grouped_values.items():
             label_score = float(
                 np.mean(grouped_scores[label])) if grouped_scores[label] else 0.0
             all_scores.extend(grouped_scores[label])
+
             value: str | list[str] = values[0] if len(values) == 1 else values
+            confidence_value: float | list[float] = grouped_scores[label][0] if len(grouped_scores[label]) == 1 else grouped_scores[label]
+            attribute_confidence[label] = confidence_value
+
             if label_score >= self.confidence_threshold:
                 attributes[label] = value
             else:
-                unknown_attributes[label] = value
+                low_confidence_attributes[label] = value
 
         confidence = float(np.mean(all_scores)) if all_scores else 0.0
 
         return PredictionResult(
             attributes=attributes,
-            unknown_attributes=unknown_attributes,
+            low_confidence_attributes=low_confidence_attributes,
+            attribute_confidence=attribute_confidence,
             message=text,
             confidence=confidence,
             model_version=self.model_version,

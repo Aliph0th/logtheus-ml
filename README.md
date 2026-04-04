@@ -7,10 +7,11 @@ ML-only pipeline for log entity extraction and unified attribute naming.
 Given a raw log line, return a stable contract:
 
 - `attributes`: canonical/unified attributes
+- `low_confidence_attributes`: extracted attributes below confidence threshold
+- `attribute_confidence`: confidence per extracted attribute
 - `message`: original message (or cleaned message in future versions)
 - `confidence`: model confidence in [0, 1]
 - `model_version`: version of loaded model
-- `parser_strategy`: always `ml_token_classifier`
 
 ## Canonical Schema
 
@@ -65,4 +66,9 @@ python training/train_token_classifier.py --train-file data/data.jsonl --val-fil
 
 ```bash
 python scripts/predict.py --model-dir artifacts/model_v1 --text "[auth] failed login for user 123 from 10.1.2.3 code=E401"
+```
+or interactively:
+
+```bash
+python scripts/interactive_predict.py --model-dir artifacts/model_v1
 ```
