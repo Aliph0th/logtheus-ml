@@ -2,6 +2,7 @@ import os
 import json
 import argparse
 from typing import List, Tuple
+from rapidfuzz import fuzz
 
 
 def pick_split_indices(n: int, val_ratio: float = 0.2) -> Tuple[set, set]:
@@ -33,7 +34,44 @@ def pick_split_indices(n: int, val_ratio: float = 0.2) -> Tuple[set, set]:
     return train_indices, val_indices
 
 
-def process_folder(folder: str, output_data: str, output_val: str):
+def remove_similar_items(items: List[dict], similarity_threshold: float = 94) -> List[dict]:
+    """Remove items with duplicate or very similar text fields.
+    
+    Args:
+        items: List of JSON objects with 'text' field
+        similarity_threshold: fuzz.ratio threshold (0-100) to consider items as similar
+        
+    Returns:
+        Filtered list with similar items removed
+    """
+    if not items:
+        return []
+    
+    filtered = []
+    for item in items:
+        if not isinstance(item, dict) or "text" not in item:
+            filtered.append(item)
+            continue
+        
+        current_text = item.get("text", "")
+        is_similar = False
+        
+        # Compare with already filtered items
+        for existing_item in filtered:
+            if not isinstance(existing_item, dict) or "text" not in existing_item:
+                continue
+            existing_text = existing_item.get("text", "")
+            if fuzz.ratio(current_text, existing_text) >= similarity_threshold:
+                is_similar = True
+                break
+        
+        if not is_similar:
+            filtered.append(item)
+    
+    return filtered
+
+
+def process_folder(folder: str, output_data: str, output_val: str, val_ratio: float = 0.2):
     data_items = []
     val_items = []
     files = sorted(
@@ -61,12 +99,20 @@ def process_folder(folder: str, output_data: str, output_val: str):
                     raise ValueError(
                         f"Expected JSON object (dict) in file {path}, line {line_no}, got {type(obj)}")
                 lines.append(obj)
+        
+        # Remove similar items from this file before splitting
+        original_count = len(lines)
+        lines = remove_similar_items(lines, similarity_threshold=94)
+        removed_count = original_count - len(lines)
+        if removed_count > 0:
+            print(f"  Removed {removed_count} similar items (kept {len(lines)})")
+        
         n = len(lines)
         if n == 0:
             print(
                 f"  Warning: file {path} is empty or has no valid JSON objects, skipping.")
             continue
-        train_idx, val_idx = pick_split_indices(n, val_ratio=0.2)
+        train_idx, val_idx = pick_split_indices(n, val_ratio=val_ratio)
         for i in range(n):
             if i in val_idx:
                 val_items.append(lines[i])
@@ -93,12 +139,20 @@ def process_folder(folder: str, output_data: str, output_val: str):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Split JSONL files in a folder into data/val and renumber ids starting from 1.")
+        description="Split JSONL files in a folder into data/val, remove similar items, and renumber ids starting from 1.")
     parser.add_argument(
         "folder", help="Path to folder containing .jsonl files")
-    parser.add_argument("--data", "-d", default="data/data.jsonl",
-                        help="Output train file (default: data/data.jsonl)")
+    parser.add_argument("--data", "-d", default="data/train.jsonl",
+                        help="Output train file (default: data/train.jsonl)")
     parser.add_argument("--val", "-v", default="data/val.jsonl",
                         help="Output val file (default: data/val.jsonl)")
+    parser.add_argument("--p", "-p", type=float, default=0.8,
+                        help="Train ratio (0-1), e.g., 0.8 = 80%% train, 20%% val (default: 0.8)")
     args = parser.parse_args()
-    process_folder(args.folder, args.data, args.val)
+    
+    # Validate p parameter
+    if not 0 < args.p < 1:
+        raise ValueError("--p must be between 0 and 1 (exclusive)")
+    
+    val_ratio = 1 - args.p
+    process_folder(args.folder, args.data, args.val, val_ratio=val_ratio)

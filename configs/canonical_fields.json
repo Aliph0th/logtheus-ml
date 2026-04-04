@@ -7,7 +7,7 @@
     "event",
     "error_message",
     "status_code",
-    "duration_ms",
+    "duration",
     "ip",
     "method",
     "path",

@@ -19,7 +19,7 @@ The canonical fields are defined in `configs/canonical_fields.json`.
 
 ## How Equivalent Fields Are Learned
 
-Your model understands equivalent keys through training examples, not hardcoded regex.
+Model understands equivalent keys through training examples, not hardcoded regex.
 
 Examples in data:
 
@@ -49,18 +49,50 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+## Data Processing
+
+Before training, prepare your raw JSONL files by running:
+
+```bash
+python scripts/process_data.py /path/to/raw/logs --data data/train.jsonl --val data/val.jsonl
+```
+
+This script:
+- **Removes duplicate & similar logs**: Filters logs with `fuzz.ratio >= 94` within each file (requires `rapidfuzz`)
+- **Splits into train/val**: Divides data according to the `--p` parameter (train ratio)
+- **Renumbers IDs**: Assigns sequential IDs starting from 1
+
+### Options
+
+- `folder`: Path to folder with `.jsonl` files to process
+- `--data`, `-d`: Output train file (default: `data/train.jsonl`)
+- `--val`, `-v`: Output val file (default: `data/val.jsonl`)
+- `--p`: Train ratio in [0, 1], e.g., `0.8` = 80% train, 20% val (default: `0.8`)
+
 ## Train
 
 ```bash
-python training/train_token_classifier.py --train-file data/data.jsonl --val-file data/val.jsonl --output-dir artifacts/model_v1
+python training/train_token_classifier.py --train-file data/train.jsonl --val-file data/val.jsonl --output-dir artifacts/model_v1
 ```
 
 Default base model: `bert-base-uncased` (110M params, good quality/speed balance for logs).
 
-To use a different model:
+### Model Caching
+
+By default, the base model (e.g., `bert-base-uncased`) is cached locally in `models/pretrained/` directory within the project. This way, you don't need to re-download it for subsequent training runs.
+
+To use a different cache directory:
 
 ```bash
-python training/train_token_classifier.py --train-file data/data.jsonl --val-file data/val.jsonl --output-dir artifacts/model_v1 --base-model distilbert-base-uncased
+python training/train_token_classifier.py --train-file data/train.jsonl --val-file data/val.jsonl --output-dir artifacts/model_v1 --cache-dir /path/to/cache
+```
+
+### Alternative Base Models
+
+To use a different model (e.g., DistilBERT for faster training):
+
+```bash
+python training/train_token_classifier.py --train-file data/train.jsonl --val-file data/val.jsonl --output-dir artifacts/model_v1 --base-model distilbert-base-uncased
 ```
 ## Inference Example
 
@@ -70,5 +102,5 @@ python scripts/predict.py --model-dir artifacts/model_v1 --text "[auth] failed l
 or interactively:
 
 ```bash
-python scripts/interactive_predict.py --model-dir artifacts/model_v1
+python scripts/predict.py --model-dir artifacts/model_v1
 ```

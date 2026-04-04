@@ -35,14 +35,19 @@ def main() -> None:
     parser.add_argument("--base-model", default="bert-base-uncased")
     parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument("--batch-size", type=int, default=16)
+    parser.add_argument("--cache-dir", default="models/pretrained", 
+                        help="Local directory to cache downloaded models")
     args = parser.parse_args()
+
+    cache_dir = Path(args.cache_dir)
+    cache_dir.mkdir(parents=True, exist_ok=True)
 
     train_rows = load_jsonl(Path(args.train_file))
     val_rows = load_jsonl(Path(args.val_file))
 
     label2id, id2label = build_label_maps(train_rows + val_rows)
 
-    tokenizer = AutoTokenizer.from_pretrained(args.base_model)
+    tokenizer = AutoTokenizer.from_pretrained(args.base_model, cache_dir=str(cache_dir))
 
     train_encoded = [encode_row(row, tokenizer, label2id)
                      for row in train_rows]
@@ -56,6 +61,7 @@ def main() -> None:
         num_labels=len(label2id),
         id2label=id2label,
         label2id=label2id,
+        cache_dir=str(cache_dir),
     )
 
     metric = evaluate.load("seqeval")

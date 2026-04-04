@@ -17,6 +17,7 @@ go.work.sum
 .venv/
 __pycache__/
 artifacts/
+models/
 
 .env
 .vscode/
